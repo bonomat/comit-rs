@@ -142,12 +142,6 @@ impl Swarm {
 
         guard.initiate_communication(id, swap_params)
     }
-
-    pub async fn get_finalized_swap(&self, id: LocalSwapId) -> Option<comit_ln::FinalizedSwap> {
-        let mut guard = self.inner.lock().await;
-
-        guard.get_finalized_swap(id)
-    }
 }
 
 struct TokioExecutor {
@@ -332,10 +326,6 @@ impl ComitNode {
     ) -> anyhow::Result<()> {
         self.supports_halight()?;
         self.comit_ln.initiate_communication(id, swap_params)
-    }
-
-    pub fn get_finalized_swap(&mut self, id: LocalSwapId) -> Option<comit_ln::FinalizedSwap> {
-        self.comit_ln.get_finalized_swap(id)
     }
 
     fn supports_halight(&self) -> anyhow::Result<()> {

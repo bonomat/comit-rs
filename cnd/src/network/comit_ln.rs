@@ -1,5 +1,5 @@
 use crate::{
-    asset, identity,
+    identity,
     network::{
         oneshot_behaviour,
         protocols::{
@@ -10,13 +10,10 @@ use crate::{
     },
     seed::{DeriveSwapSeed, RootSeed},
     swap_protocols::{
-        ledger::{ethereum::ChainId, lightning, Ethereum},
-        rfc003::{create_swap::HtlcParams, DeriveSecret, Secret, SecretHash},
+        rfc003::{DeriveSecret, SecretHash},
         HanEtherereumHalightBitcoinCreateSwapParams, LocalSwapId, Role, SharedSwapId,
     },
-    timestamp::Timestamp,
 };
-use blockchain_contracts::ethereum::rfc003::ether_htlc::EtherHtlc;
 use digest::Digest;
 use futures::AsyncWriteExt;
 use libp2p::{
@@ -129,72 +126,6 @@ impl ComitLN {
         Ok(())
     }
 
-    pub fn get_finalized_swap(&self, swap_id: LocalSwapId) -> Option<FinalizedSwap> {
-        let create_swap_params = match self.swaps.get(&swap_id) {
-            Some(body) => body,
-            None => return None,
-        };
-
-        let secret = match create_swap_params.role {
-            Role::Alice => Some(self.seed.derive_swap_seed(swap_id).derive_secret()),
-            Role::Bob => None,
-        };
-
-        let id = match self.swap_ids.get(&swap_id).copied() {
-            Some(id) => id,
-            None => return None,
-        };
-
-        let alpha_ledger_redeem_identity = match create_swap_params.role {
-            Role::Alice => match self.ethereum_identities.get(&id).copied() {
-                Some(identity) => identity,
-                None => return None,
-            },
-            Role::Bob => create_swap_params.ethereum_identity.into(),
-        };
-        let alpha_ledger_refund_identity = match create_swap_params.role {
-            Role::Alice => create_swap_params.ethereum_identity.into(),
-            Role::Bob => match self.ethereum_identities.get(&id).copied() {
-                Some(identity) => identity,
-                None => return None,
-            },
-        };
-        let beta_ledger_redeem_identity = match create_swap_params.role {
-            Role::Alice => create_swap_params.lightning_identity,
-            Role::Bob => match self.lightning_identities.get(&id).copied() {
-                Some(identity) => identity,
-                None => return None,
-            },
-        };
-        let beta_ledger_refund_identity = match create_swap_params.role {
-            Role::Alice => match self.lightning_identities.get(&id).copied() {
-                Some(identity) => identity,
-                None => return None,
-            },
-            Role::Bob => create_swap_params.lightning_identity,
-        };
-
-        Some(FinalizedSwap {
-            alpha_ledger: Ethereum::new(ChainId::regtest()),
-            beta_ledger: lightning::Regtest,
-            alpha_asset: create_swap_params.ethereum_amount.clone(),
-            beta_asset: create_swap_params.lightning_amount,
-            alpha_ledger_redeem_identity,
-            alpha_ledger_refund_identity,
-            beta_ledger_redeem_identity,
-            beta_ledger_refund_identity,
-            alpha_expiry: create_swap_params.ethereum_absolute_expiry,
-            beta_expiry: create_swap_params.lightning_cltv_expiry,
-            swap_id,
-            secret,
-            secret_hash: match self.secret_hashes.get(&id).copied() {
-                Some(secret_hash) => secret_hash,
-                None => return None,
-            },
-            role: create_swap_params.role,
-        })
-    }
-
     fn poll<BIE>(
         &mut self,
         _cx: &mut Context<'_>,
@@ -217,38 +148,6 @@ impl fmt::Display for SwapExists {
         // This impl is required to build but want to use a static string for
         // this when returning it via the REST API.
         write!(f, "")
-    }
-}
-
-#[derive(Debug)]
-pub struct FinalizedSwap {
-    pub alpha_ledger: Ethereum,
-    pub beta_ledger: lightning::Regtest,
-    pub alpha_asset: asset::Ether,
-    pub beta_asset: asset::Bitcoin,
-    pub alpha_ledger_refund_identity: identity::Ethereum,
-    pub alpha_ledger_redeem_identity: identity::Ethereum,
-    pub beta_ledger_refund_identity: identity::Lightning,
-    pub beta_ledger_redeem_identity: identity::Lightning,
-    pub alpha_expiry: Timestamp,
-    pub beta_expiry: Timestamp,
-    pub swap_id: LocalSwapId,
-    pub secret_hash: SecretHash,
-    pub secret: Option<Secret>,
-    pub role: Role,
-}
-
-impl FinalizedSwap {
-    pub fn han_params(&self) -> EtherHtlc {
-        HtlcParams {
-            asset: self.alpha_asset.clone(),
-            ledger: Ethereum::new(ChainId::regtest()),
-            redeem_identity: self.alpha_ledger_redeem_identity,
-            refund_identity: self.alpha_ledger_refund_identity,
-            expiry: self.alpha_expiry,
-            secret_hash: self.secret_hash,
-        }
-        .into()
     }
 }
 
