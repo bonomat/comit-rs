@@ -148,10 +148,6 @@ impl Swarm {
 
         guard.get_finalized_swap(id)
     }
-
-    // On Bob's side, when an announce message is received execute the required
-    // communication protocols and write the finalized swap to the database.  Then
-    // spawn the same as is done for Alice.
 }
 
 struct TokioExecutor {
