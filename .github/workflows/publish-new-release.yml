@@ -29,4 +29,7 @@ jobs:
           docker run --publish 8000:8000 --detach --name cnd_container2 comitnetwork/cnd
           curl --fail localhost:8001/
           echo "::cnd API curled successfully"
-          docker stop cnd_container
+          docker stop cnd_container2
+      - name: should never run
+        run: |
+          echo "::this should never run because the step before failed"
